@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Build & Test
+    # macos-15 ships an Xcode with Swift 6 tools (the package requires 6.0).
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode with Swift 6
+        run: |
+          # Prefer the newest installed Xcode 16+, falling back to the default.
+          XCODE="$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)"
+          [ -n "$XCODE" ] || XCODE="/Applications/Xcode.app"
+          echo "Using $XCODE"
+          sudo xcode-select -switch "$XCODE"
+          swift --version
+
+      - name: Run tests
+        run: swift test
+
+      - name: Build app bundle
+        run: ./scripts/build_app.sh 0.0.0-ci

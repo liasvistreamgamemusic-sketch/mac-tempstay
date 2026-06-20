@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish DMG
+    # macos-15 ships an Xcode with Swift 6 tools (the package requires 6.0).
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # build number derives from commit count
+
+      - name: Select Xcode with Swift 6
+        run: |
+          # Prefer the newest installed Xcode 16+, falling back to the default.
+          XCODE="$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)"
+          [ -n "$XCODE" ] || XCODE="/Applications/Xcode.app"
+          echo "Using $XCODE"
+          sudo xcode-select -switch "$XCODE"
+          swift --version
+
+      - name: Resolve version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        run: swift test
+
+      - name: Build app bundle
+        run: ./scripts/build_app.sh "${{ steps.version.outputs.version }}"
+
+      - name: Create DMG
+        run: ./scripts/make_dmg.sh "${{ steps.version.outputs.version }}"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DMG="dist/Perch-${{ steps.version.outputs.version }}.dmg"
+          # Idempotent: create the release if missing, otherwise (re)upload the asset.
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "$DMG" --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" "$DMG" \
+              --title "Perch ${{ steps.version.outputs.version }}" \
+              --notes "See [CHANGELOG.md](./CHANGELOG.md) for details." \
+              --verify-tag
+          fi
