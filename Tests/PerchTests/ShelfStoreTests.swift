@@ -1,26 +1,30 @@
 import XCTest
 @testable import Perch
 
-@MainActor
 final class ShelfStoreTests: XCTestCase {
     private var tempRoot: URL!
     private var storage: ItemStorage!
-    private var settings: SettingsStore!
 
     override func setUpWithError() throws {
         tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("PerchStore-\(UUID().uuidString)", isDirectory: true)
         storage = ItemStorage(rootOverride: tempRoot)
-        let defaults = UserDefaults(suiteName: "PerchTests-\(UUID().uuidString)")!
-        settings = SettingsStore(defaults: defaults)
     }
 
     override func tearDownWithError() throws {
         try? FileManager.default.removeItem(at: tempRoot)
     }
 
+    /// A fresh, isolated settings store backed by an ephemeral suite.
+    @MainActor
+    private func makeSettings() -> SettingsStore {
+        let defaults = UserDefaults(suiteName: "PerchTests-\(UUID().uuidString)")!
+        return SettingsStore(defaults: defaults)
+    }
+
+    @MainActor
     func testAddInsertsNewestFirst() {
-        let store = ShelfStore(storage: storage, settingsStore: settings)
+        let store = ShelfStore(storage: storage, settingsStore: makeSettings())
         let first = storage.makeTextItem("first")
         let second = storage.makeTextItem("second")
         store.add([first])
@@ -29,16 +33,18 @@ final class ShelfStoreTests: XCTestCase {
         XCTAssertEqual(store.count, 2)
     }
 
+    @MainActor
     func testAddDeduplicatesById() {
-        let store = ShelfStore(storage: storage, settingsStore: settings)
+        let store = ShelfStore(storage: storage, settingsStore: makeSettings())
         let item = storage.makeTextItem("dup")
         store.add([item])
         store.add([item])
         XCTAssertEqual(store.count, 1)
     }
 
+    @MainActor
     func testRemoveAndClear() {
-        let store = ShelfStore(storage: storage, settingsStore: settings)
+        let store = ShelfStore(storage: storage, settingsStore: makeSettings())
         let a = storage.makeTextItem("a")
         let b = storage.makeTextItem("b")
         store.add([a, b])
@@ -48,7 +54,9 @@ final class ShelfStoreTests: XCTestCase {
         XCTAssertTrue(store.isEmpty)
     }
 
-    func testPersistenceAcrossStoreInstances() throws {
+    @MainActor
+    func testPersistenceAcrossStoreInstances() {
+        let settings = makeSettings()
         let store = ShelfStore(storage: storage, settingsStore: settings)
         store.add([storage.makeTextItem("persisted")])
 
@@ -58,7 +66,9 @@ final class ShelfStoreTests: XCTestCase {
         XCTAssertEqual(reopened.items.first?.title, "persisted")
     }
 
+    @MainActor
     func testDoesNotPersistWhenDisabled() {
+        let settings = makeSettings()
         settings.update { $0.persistItemsAcrossLaunches = false }
         let store = ShelfStore(storage: storage, settingsStore: settings)
         store.add([storage.makeTextItem("ephemeral")])
@@ -68,7 +78,6 @@ final class ShelfStoreTests: XCTestCase {
     }
 }
 
-@MainActor
 final class ShelfEdgeTests: XCTestCase {
     private let screen = CGRect(x: 0, y: 0, width: 1440, height: 900)
     private let size = CGSize(width: 240, height: 420)
