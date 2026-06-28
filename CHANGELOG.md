@@ -5,6 +5,15 @@ All notable changes to Perch are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-06-29
+
+### Fixed
+
+- シェルフからのドラッグ取り出しが「ファイルプロミス」方式になっており、Teams・Slack・VS Code など
+  Electron / Web 系のドロップ先で実体のファイルにならず、テキスト扱いになってしまう問題を修正。
+  実ファイル URL（`public.file-url`）を直接渡す AppKit ドラッグ源に置き換え、あらゆるアプリへ
+  ファイルとして取り出せるようにした。
+
 ## [0.1.0] - 2026-06-20
 
 最初のリリース。Yoink 系の「画面端の一時シェルフ」ワークフローを再現。
@@ -24,4 +33,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - アプリ終了後のアイテム保持オプション。
 - GitHub Releases ベースの自動アップデート（通知 → ダウンロード → その場で置き換え）。
 
+[0.1.1]: https://github.com/liasvistreamgamemusic-sketch/mac-tempstay/releases/tag/v0.1.1
 [0.1.0]: https://github.com/liasvistreamgamemusic-sketch/mac-tempstay/releases/tag/v0.1.0

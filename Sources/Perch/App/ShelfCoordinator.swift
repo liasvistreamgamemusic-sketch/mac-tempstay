@@ -10,7 +10,6 @@ final class ShelfCoordinator {
     private let settingsStore: SettingsStore
     private let storage: ItemStorage
     private let reader: PasteboardReader
-    private let dragProvider: DragProvider
     private let edgeTrigger: EdgeTriggerController
     private var windowController: ShelfWindowController!
 
@@ -23,12 +22,10 @@ final class ShelfCoordinator {
         self.storage = storage
         self.shelfStore = ShelfStore(storage: storage, settingsStore: settingsStore)
         self.reader = PasteboardReader(storage: storage)
-        self.dragProvider = DragProvider(store: shelfStore)
         self.edgeTrigger = EdgeTriggerController(settingsStore: settingsStore)
 
         let shelfView = ShelfView(
             store: shelfStore,
-            makeProvider: { [weak self] item in self?.dragProvider.itemProvider(for: item) },
             onOpen: { [weak self] item in self?.open(item) },
             onRemove: { [weak self] item in self?.remove(item) },
             onClear: { [weak self] in self?.clear() }

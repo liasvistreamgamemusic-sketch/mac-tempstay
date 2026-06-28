@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 /// The shelf's SwiftUI surface: a header with the item count and a clear
@@ -6,8 +5,6 @@ import SwiftUI
 struct ShelfView: View {
     @ObservedObject var store: ShelfStore
 
-    /// Builds the drag pasteboard provider for an item being dragged out.
-    let makeProvider: (ShelfItem) -> NSItemProvider?
     /// Open / preview an item (double-click).
     let onOpen: (ShelfItem) -> Void
     /// Remove a single item.
@@ -64,13 +61,13 @@ struct ShelfView: View {
         ScrollView {
             LazyVStack(spacing: 6) {
                 ForEach(store.items) { item in
-                    ShelfItemRow(
+                    DraggableItemView(
                         item: item,
                         contentURL: store.contentURL(for: item),
                         onOpen: { onOpen(item) },
                         onRemove: { onRemove(item) }
                     )
-                    .onDrag { makeProvider(item) ?? NSItemProvider() }
+                    .frame(maxWidth: .infinity)
                 }
             }
             .padding(8)
@@ -95,15 +92,15 @@ struct ShelfView: View {
     }
 }
 
-/// A single draggable row: thumbnail, title and subtitle, with a delete button
-/// that appears on hover.
-struct ShelfItemRow: View {
+/// The visual content of a single shelf row: thumbnail, title and subtitle.
+///
+/// Render-only — input (double-click to open, hover delete, drag out) is handled
+/// by `DraggingSourceView`, which drives `isHovering` and overlays the delete
+/// button. Trailing space is reserved for that button while hovering.
+struct ShelfItemRowContent: View {
     let item: ShelfItem
     let contentURL: URL?
-    let onOpen: () -> Void
-    let onRemove: () -> Void
-
-    @State private var isHovering = false
+    let isHovering: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -128,25 +125,16 @@ struct ShelfItemRow: View {
             }
             Spacer(minLength: 0)
 
-            if isHovering {
-                Button(action: onRemove) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 13))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help("削除")
-            }
+            // Reserve room for the AppKit delete button overlaid on hover.
+            Color.clear.frame(width: isHovering ? 20 : 0)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(isHovering ? Color.primary.opacity(0.08) : Color.primary.opacity(0.03))
         )
-        .contentShape(Rectangle())
-        .onHover { isHovering = $0 }
-        .onTapGesture(count: 2, perform: onOpen)
         .help(item.title)
     }
 }
