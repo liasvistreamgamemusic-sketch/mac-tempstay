@@ -13,19 +13,37 @@ import SwiftUI
 struct DraggableItemView: NSViewRepresentable {
     let item: ShelfItem
     let contentURL: URL?
+    /// Whether the row is part of the shelf's current selection.
+    let isSelected: Bool
     /// Open / preview the item (double-click).
     let onOpen: () -> Void
     /// Remove the item (hover delete button).
     let onRemove: () -> Void
+    /// Select the item (single click); the Bool is whether ⌘ was held.
+    let onSelect: (Bool) -> Void
 
     func makeNSView(context: Context) -> DraggingSourceView {
         let view = DraggingSourceView()
-        view.update(item: item, contentURL: contentURL, onOpen: onOpen, onRemove: onRemove)
+        view.update(
+            item: item,
+            contentURL: contentURL,
+            isSelected: isSelected,
+            onOpen: onOpen,
+            onRemove: onRemove,
+            onSelect: onSelect
+        )
         return view
     }
 
     func updateNSView(_ nsView: DraggingSourceView, context: Context) {
-        nsView.update(item: item, contentURL: contentURL, onOpen: onOpen, onRemove: onRemove)
+        nsView.update(
+            item: item,
+            contentURL: contentURL,
+            isSelected: isSelected,
+            onOpen: onOpen,
+            onRemove: onRemove,
+            onSelect: onSelect
+        )
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: DraggingSourceView, context: Context) -> CGSize? {
@@ -47,8 +65,10 @@ final class DraggingSourceView: NSView, NSDraggingSource {
 
     private var item: ShelfItem?
     private var contentURL: URL?
+    private var isSelected = false
     private var onOpen: () -> Void = {}
     private var onRemove: () -> Void = {}
+    private var onSelect: (Bool) -> Void = { _ in }
 
     private var isHovering = false
     private var pressOrigin: NSPoint?
@@ -86,19 +106,34 @@ final class DraggingSourceView: NSView, NSDraggingSource {
         ])
     }
 
-    /// Re-applies the item, content URL and callbacks, re-rendering the row.
-    func update(item: ShelfItem, contentURL: URL?, onOpen: @escaping () -> Void, onRemove: @escaping () -> Void) {
+    /// Re-applies the item, content URL, selection and callbacks, re-rendering
+    /// the row.
+    func update(
+        item: ShelfItem,
+        contentURL: URL?,
+        isSelected: Bool,
+        onOpen: @escaping () -> Void,
+        onRemove: @escaping () -> Void,
+        onSelect: @escaping (Bool) -> Void
+    ) {
         self.item = item
         self.contentURL = contentURL
+        self.isSelected = isSelected
         self.onOpen = onOpen
         self.onRemove = onRemove
+        self.onSelect = onSelect
         renderContent()
     }
 
     private func renderContent() {
         guard let item else { return }
         hostingView.rootView = AnyView(
-            ShelfItemRowContent(item: item, contentURL: contentURL, isHovering: isHovering)
+            ShelfItemRowContent(
+                item: item,
+                contentURL: contentURL,
+                isHovering: isHovering,
+                isSelected: isSelected
+            )
         )
     }
 
@@ -148,6 +183,9 @@ final class DraggingSourceView: NSView, NSDraggingSource {
             onOpen()
             return
         }
+        // Select on mouse-down (Finder-style) so a drag-out also visibly acts
+        // on a selected row; ⌘-click toggles membership instead.
+        onSelect(event.modifierFlags.contains(.command))
         pressOrigin = event.locationInWindow
     }
 

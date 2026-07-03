@@ -7,6 +7,7 @@ import AppKit
 final class ShelfCoordinator {
     let shelfStore: ShelfStore
 
+    private let selection = ShelfSelection()
     private let settingsStore: SettingsStore
     private let storage: ItemStorage
     private let reader: PasteboardReader
@@ -26,14 +27,25 @@ final class ShelfCoordinator {
 
         let shelfView = ShelfView(
             store: shelfStore,
+            selection: selection,
             onOpen: { [weak self] item in self?.open(item) },
             onRemove: { [weak self] item in self?.remove(item) },
-            onClear: { [weak self] in self?.clear() }
+            onClear: { [weak self] in self?.clear() },
+            onSelect: { [weak self] item, commandHeld in
+                guard let self else { return }
+                commandHeld ? self.selection.toggle(item.id) : self.selection.select(item.id)
+            }
         )
         self.windowController = ShelfWindowController(settingsStore: settingsStore, shelfView: shelfView)
 
         windowController.onDrop = { [weak self] pasteboard in
             self?.handleDrop(from: pasteboard) ?? false
+        }
+        windowController.onKeyCommand = { [weak self] command in
+            self?.handle(keyCommand: command) ?? false
+        }
+        windowController.onPanelResignedKey = { [weak self] in
+            self?.selection.clear()
         }
         edgeTrigger.onApproach = { [weak self] in
             self?.windowController.revealForIncomingDrag()
@@ -54,6 +66,56 @@ final class ShelfCoordinator {
     func settingsChanged() {
         edgeTrigger.apply()
         windowController.repositionForCurrentEdge()
+    }
+
+    // MARK: - Keyboard commands (shelf panel is key)
+
+    private func handle(keyCommand: ShelfKeyCommand) -> Bool {
+        switch keyCommand {
+        case .copy:
+            copySelection()
+        case .paste:
+            stashClipboard()
+        case .selectAll:
+            selection.selectAll(shelfStore.items)
+        case .delete:
+            removeSelection()
+        case .escape:
+            // Two-stage: first clear the selection, then dismiss the shelf.
+            if selection.isEmpty {
+                windowController.hide()
+            } else {
+                selection.clear()
+            }
+        }
+        return true
+    }
+
+    /// Writes the selected items to the general pasteboard, in shelf order.
+    /// Files/images vend their real file URLs, so ⌘V in Finder copies the
+    /// files; text/links paste as strings/URLs.
+    private func copySelection() {
+        let selected = shelfStore.items.filter { selection.contains($0.id) }
+        let writers = selected.compactMap {
+            DragPasteboard.writer(for: $0, contentURL: shelfStore.contentURL(for: $0))
+        }
+        guard !writers.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects(writers)
+    }
+
+    private func removeSelection() {
+        guard !selection.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        shelfStore.remove(ids: selection.ids)
+        selection.clear()
+        notifyCountChanged()
     }
 
     // MARK: - Ingestion
@@ -103,11 +165,13 @@ final class ShelfCoordinator {
 
     private func remove(_ item: ShelfItem) {
         shelfStore.remove(item)
+        selection.prune(existing: shelfStore.items)
         notifyCountChanged()
     }
 
     private func clear() {
         shelfStore.clear()
+        selection.clear()
         notifyCountChanged()
     }
 

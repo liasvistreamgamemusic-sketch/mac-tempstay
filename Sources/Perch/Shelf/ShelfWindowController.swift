@@ -12,11 +12,16 @@ final class ShelfWindowController {
 
     /// Called when a drop is received; returns whether it added anything.
     var onDrop: ((NSPasteboard) -> Bool)?
+    /// Handles a keyboard command from the key panel; returns whether consumed.
+    var onKeyCommand: ((ShelfKeyCommand) -> Bool)?
+    /// Called when the panel loses key status (e.g. to clear the selection).
+    var onPanelResignedKey: (() -> Void)?
 
     private(set) var isVisible = false
     private var isDragInside = false
     private var isPointerInside = false
     private var autoHideWorkItem: DispatchWorkItem?
+    private var resignKeyObserver: NSObjectProtocol?
     /// Suppresses auto-hide while the user explicitly pinned the shelf open
     /// (e.g. summoned by hotkey rather than by a drag).
     private var isPinnedOpen = false
@@ -28,6 +33,13 @@ final class ShelfWindowController {
         self.container = ShelfContainerView(rootView: shelfView)
         panel.contentView = container
         wireContainer()
+        wirePanel()
+    }
+
+    deinit {
+        if let resignKeyObserver {
+            NotificationCenter.default.removeObserver(resignKeyObserver)
+        }
     }
 
     private func wireContainer() {
@@ -59,6 +71,25 @@ final class ShelfWindowController {
         }
     }
 
+    private func wirePanel() {
+        panel.onKeyCommand = { [weak self] command in
+            self?.onKeyCommand?(command) ?? false
+        }
+        // Losing key status ends the "focused" session: notify (so the
+        // selection clears) and let auto-hide take over again.
+        resignKeyObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.onPanelResignedKey?()
+                self.scheduleAutoHideIfNeeded()
+            }
+        }
+    }
+
     // MARK: - Visibility
 
     func toggle() {
@@ -83,6 +114,12 @@ final class ShelfWindowController {
             panel.orderFrontRegardless()
         }
         isVisible = true
+
+        // Explicit summon (hotkey/menu): take key so ⌘V works immediately.
+        // Drag-reveals stay non-key to never disturb the source app.
+        if pinned {
+            panel.makeKey()
+        }
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.22
@@ -137,11 +174,14 @@ final class ShelfWindowController {
     private func scheduleAutoHideIfNeeded() {
         cancelAutoHide()
         guard settingsStore.settings.autoHide, isVisible, !isPinnedOpen else { return }
-        guard !isDragInside, !isPointerInside else { return }
+        // While the panel is key the user is interacting via keyboard
+        // (⌘C/⌘V…); don't slide away mid-interaction.
+        guard !isDragInside, !isPointerInside, !panel.isKeyWindow else { return }
 
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            guard !self.isDragInside, !self.isPointerInside, !self.isPinnedOpen else { return }
+            guard !self.isDragInside, !self.isPointerInside, !self.isPinnedOpen,
+                  !self.panel.isKeyWindow else { return }
             self.hide()
         }
         autoHideWorkItem = work

@@ -5,6 +5,21 @@ All notable changes to Perch are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-07-03
+
+### Added
+
+- シェルフのキーボード操作（シェルフをクリックする、またはショートカットで呼び出してフォーカスがあるときのみ有効）:
+  - クリックで選択、⌘クリックで複数選択、⌘A で全選択。選択行はハイライト表示。
+  - ⌘C — 選択アイテムをクリップボードへコピー。ファイル/画像は実ファイルとしてコピーされるので、
+    Finder のフォルダで ⌘V するとファイルが複製される。テキスト/URL は文字列として貼り付け可能。
+  - ⌘V — クリップボードの内容（ファイル・画像・テキスト・URL）をシェルフへ取り込み。
+  - Delete — 選択アイテムを削除。
+  - Esc — 選択解除、もう一度押すとシェルフを閉じる。
+- キーボード操作中（シェルフがフォーカスを持つ間）は自動非表示を保留し、フォーカスが外れると再開。
+- シェルフへのフォーカスは Perch をアクティブにしない方式のため、ドラッグ＆ドロップ時に
+  元アプリのフォーカスを奪わない従来の挙動はそのまま。
+
 ## [0.1.1] - 2026-06-29
 
 ### Fixed
@@ -33,5 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - アプリ終了後のアイテム保持オプション。
 - GitHub Releases ベースの自動アップデート（通知 → ダウンロード → その場で置き換え）。
 
+[0.2.0]: https://github.com/liasvistreamgamemusic-sketch/mac-tempstay/releases/tag/v0.2.0
 [0.1.1]: https://github.com/liasvistreamgamemusic-sketch/mac-tempstay/releases/tag/v0.1.1
 [0.1.0]: https://github.com/liasvistreamgamemusic-sketch/mac-tempstay/releases/tag/v0.1.0

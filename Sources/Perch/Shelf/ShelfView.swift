@@ -4,6 +4,7 @@ import SwiftUI
 /// button, then the stack of draggable items (or an empty-state hint).
 struct ShelfView: View {
     @ObservedObject var store: ShelfStore
+    @ObservedObject var selection: ShelfSelection
 
     /// Open / preview an item (double-click).
     let onOpen: (ShelfItem) -> Void
@@ -11,6 +12,8 @@ struct ShelfView: View {
     let onRemove: (ShelfItem) -> Void
     /// Clear the whole shelf.
     let onClear: () -> Void
+    /// Select an item on click; the Bool is whether ⌘ was held (toggle).
+    let onSelect: (ShelfItem, Bool) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -64,8 +67,10 @@ struct ShelfView: View {
                     DraggableItemView(
                         item: item,
                         contentURL: store.contentURL(for: item),
+                        isSelected: selection.contains(item.id),
                         onOpen: { onOpen(item) },
-                        onRemove: { onRemove(item) }
+                        onRemove: { onRemove(item) },
+                        onSelect: { commandHeld in onSelect(item, commandHeld) }
                     )
                     .frame(maxWidth: .infinity)
                 }
@@ -101,6 +106,7 @@ struct ShelfItemRowContent: View {
     let item: ShelfItem
     let contentURL: URL?
     let isHovering: Bool
+    let isSelected: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -133,9 +139,15 @@ struct ShelfItemRowContent: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isHovering ? Color.primary.opacity(0.08) : Color.primary.opacity(0.03))
+                .fill(backgroundFill)
         )
         .help(item.title)
+    }
+
+    /// Selection wins over hover so a selected row stays visibly selected.
+    private var backgroundFill: Color {
+        if isSelected { return Color.accentColor.opacity(0.22) }
+        return isHovering ? Color.primary.opacity(0.08) : Color.primary.opacity(0.03)
     }
 }
 
