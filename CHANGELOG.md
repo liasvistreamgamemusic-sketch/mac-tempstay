@@ -5,6 +5,16 @@ All notable changes to Perch are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-07-13
+
+### Fixed
+
+- クリップボードから取り込んだ画像（スクリーンショットのコピー → ⌘V 等）を Teams など
+  Chromium 系アプリに貼ると、極端に明るく表示される問題を修正。取り込み時の PNG 再エンコードが
+  色メタデータを壊していた（`sRGB` チャンクが誤った `gAMA` タグに置き換わり、gAMA を尊重する
+  デコーダで中間調が持ち上がる）。PNG はバイトをそのまま保存し、TIFF もカラープロファイルを
+  保持したまま PNG に変換するようにした。ピクセル自体は無傷のため、修正後に取り込み直せば直る。
+
 ## [0.2.0] - 2026-07-03
 
 ### Added

@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import UniformTypeIdentifiers
 
 /// Owns the on-disk home for shelf content under Application Support.
@@ -182,10 +183,26 @@ final class ItemStorage {
         return nil
     }
 
-    /// Re-encodes arbitrary bitmap data as PNG. Returns `nil` if undecodable.
+    /// Returns `data` as PNG bytes, or `nil` if undecodable.
+    ///
+    /// PNG input is passed through untouched: re-encoding rewrites color
+    /// metadata (e.g. a screenshot's `sRGB` chunk becomes a wrong `gAMA` tag,
+    /// which brightens the image in Chromium-based receivers like Teams).
+    /// Other formats are transcoded via ImageIO, which carries the source's
+    /// color profile into the PNG.
     private static func pngData(from data: Data) -> Data? {
-        guard let rep = NSBitmapImageRep(data: data) else { return nil }
-        return rep.representation(using: .png, properties: [:])
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              CGImageSourceGetCount(source) > 0 else { return nil }
+        if let type = CGImageSourceGetType(source) as String?,
+           UTType(type)?.conforms(to: .png) == true {
+            return data
+        }
+        let output = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            output, UTType.png.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImageFromSource(destination, source, 0, nil)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return output as Data
     }
 
     /// A short single-line title for a text snippet.
